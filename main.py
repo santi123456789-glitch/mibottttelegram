@@ -1,26 +1,42 @@
-import time
 import requests
+import time
+import telebot
+import os
 
-TELEGRAM_TOKEN = "8024006886:AAHhfBX0zaxm02x17tJXBPt45zuwP-hraEM"
-CHAT_ID = "7633225167"
+# Variables del entorno desde Render
+TOKEN = os.getenv("TELEGRAM_TOKEN")
+CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-def enviar_senal(mensaje):
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
-    data = {
-        "chat_id": CHAT_ID,
-        "text": mensaje
-    }
-    requests.post(url, data=data)
+bot = telebot.TeleBot(TOKEN)
 
-def obtener_senal():
-    # Simulamos una señal real cada 5 segundos
-    return "📈 Señal de ejemplo: Comprar EUR/USD"
+last_price = None
 
-def main():
+def get_price():
+    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    data = requests.get(url).json()
+    return float(data["price"])
+
+@bot.message_handler(commands=["start"])
+def start(message):
+    bot.send_message(message.chat.id, "✅ Bot de señales iniciado con datos reales.")
+    monitor_price()
+
+def monitor_price():
+    global last_price
     while True:
-        senal = obtener_senal()
-        enviar_senal(senal)
-        time.sleep(5)
+        try:
+            current_price = get_price()
+            if last_price is not None:
+                if current_price > last_price:
+                    bot.send_message(CHAT_ID, f"📈 Señal REAL: El precio subió a {current_price}")
+                elif current_price < last_price:
+                    bot.send_message(CHAT_ID, f"📉 Señal REAL: El precio bajó a {current_price}")
+            last_price = current_price
+            time.sleep(5)  # cada 5 segundos
+        except Exception as e:
+            print("Error:", e)
+            time.sleep(5)
 
-if __name__ == "__main__":
-    main()
+# Iniciar el bot
+bot.polling()
+
