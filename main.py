@@ -3,7 +3,7 @@ import requests
 import os
 
 BOT_TOKEN = os.getenv("BOT_TOKEN", "7401135193:AAFZTHeF_YcU4ROosBoNHgC6pOmoipU9QSc")
-API_KEY = os.getenv("API_KEY", "EHLLSMJU9HV03O6H")
+API_KEY = os.getenv("API_KEY", "C98M0NCRAD0K1BT2.")
 SYMBOL = "EUR/USD"
 
 bot = telebot.TeleBot(BOT_TOKEN)
