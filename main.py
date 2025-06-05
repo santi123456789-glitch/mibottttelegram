@@ -1,55 +1,64 @@
 import telebot
 import requests
-from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
+import os
 
-BOT_TOKEN = "8024006886:AAHhfBX0zaxm02x17tJXBPt45zuwP-hraEM"
-API_KEY = "EHLLSMJU9HV03O6H"
+BOT_TOKEN = os.getenv("BOT_TOKEN", "8024006886:AAHhfBX0zaxm02x17tJXBPt45zuwP-hraEM")
+API_KEY = os.getenv("API_KEY", "EHLLSMJU9HV03O6H")
+SYMBOL = "EUR/USD"
 
 bot = telebot.TeleBot(BOT_TOKEN)
 
-# Guardar el precio anterior
-previous_price = None
+# Guardamos el último precio
+last_price = None
 
-# Crear el teclado con el botón EUR/USD
-def get_currency_markup():
-    markup = InlineKeyboardMarkup()
-    markup.add(InlineKeyboardButton("EUR/USD", callback_data="check_eurusd"))
-    return markup
-
-# Comando /start
-@bot.message_handler(commands=['start'])
-def start(message):
-    bot.send_message(message.chat.id, "Elegí la moneda:", reply_markup=get_currency_markup())
-
-# Al tocar el botón EUR/USD
-@bot.callback_query_handler(func=lambda call: call.data == "check_eurusd")
-def handle_currency_check(call):
-    global previous_price
-
+def get_price():
     url = f"https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_currency=EUR&to_currency=USD&apikey={API_KEY}"
     response = requests.get(url)
     data = response.json()
 
     try:
-        current_price = float(data["Realtime Currency Exchange Rate"]["5. Exchange Rate"])
-        message = f"💱 EUR/USD: {current_price:.5f}\n"
-
-        if previous_price is not None:
-            if current_price > previous_price:
-                message += "📈 El precio SUBIÓ"
-            elif current_price < previous_price:
-                message += "📉 El precio BAJÓ"
-            else:
-                message += "➖ El precio NO CAMBIÓ"
-        else:
-            message += "Este es el primer valor consultado."
-
-        previous_price = current_price
-        bot.send_message(call.message.chat.id, message, reply_markup=get_currency_markup())
-
+        price = float(data["Realtime Currency Exchange Rate"]["5. Exchange Rate"])
+        return price
     except Exception as e:
-        bot.send_message(call.message.chat.id, "⚠️ No se pudo obtener el precio.", reply_markup=get_currency_markup())
+        print("Error al obtener precio:", e)
+        return None
 
-# Ejecutar el bot
+@bot.message_handler(commands=['start'])
+def send_welcome(message):
+    markup = telebot.types.InlineKeyboardMarkup()
+    button = telebot.types.InlineKeyboardButton("EUR/USD 💶💵", callback_data="check_price")
+    markup.add(button)
+    bot.send_message(message.chat.id, "📊 Elegí una moneda para ver la señal:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: call.data == "check_price")
+def handle_price_check(call):
+    global last_price
+    current_price = get_price()
+
+    if current_price is None:
+        bot.send_message(call.message.chat.id, "❌ Error al obtener el precio.")
+        return
+
+    # Mostrar el botón de nuevo cada vez
+    markup = telebot.types.InlineKeyboardMarkup()
+    button = telebot.types.InlineKeyboardButton("EUR/USD 💶💵", callback_data="check_price")
+    markup.add(button)
+
+    if last_price is None:
+        last_price = current_price
+        msg = f"💱 Precio actual EUR/USD: {current_price:.5f}\n(Toca de nuevo para ver si sube o baja)"
+    else:
+        if current_price > last_price:
+            msg = f"📈 El precio SUBIÓ: {current_price:.5f} 🔼"
+        elif current_price < last_price:
+            msg = f"📉 El precio BAJÓ: {current_price:.5f} 🔽"
+        else:
+            msg = f"➡ El precio se MANTUVO: {current_price:.5f}"
+
+        last_price = current_price
+
+    bot.send_message(call.message.chat.id, msg, reply_markup=markup)
+
+print("✅ Bot corriendo...")
 bot.infinity_polling()
 
